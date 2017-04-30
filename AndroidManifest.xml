@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.patrick.servico_principal">
+
+<uses-permission android:name="android.permission.INTERNET"/>
+
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-feature android:name="android.hardware.location.gps" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"></uses-permission>
+
+<application
+android:allowBackup="true"
+android:icon="@mipmap/ic_launcher"
+android:label="@string/app_name"
+android:supportsRtl="true"
+android:theme="@style/AppTheme">
+<activity android:name=".MainActivity">
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity>
+
+<receiver
+    android:name=".Listener_de_Boot_Completo">
+    <intent-filter>
+        <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="com.example.patrick.USER_ACTION" />
+        <action android:name="com.example.patrick.START_SERVICOCOLETA_DADOS" />
+        <action android:name="com.example.patrick.START_SERVICODOWNLOAD" />
+        <action android:name="com.example.patrick.START_SERVICOGERENCIAMENTO" />
+    </intent-filter>
+</receiver>
+
+
+    <service android:name=".ServicoParaGPS" />
+    <service android:name=".ServicoDownload" />
+<service android:name=".ServicoGerenciamento" />
+<service android:name=".ServicoColetaDados" />
+<service android:name=".ServicoListenerDesconectouCarregador" />
+
+
+</application>
+
+</manifest>
