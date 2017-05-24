@@ -4,8 +4,11 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Vibrator;
+import android.speech.tts.TextToSpeech;
 import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -19,6 +22,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Calendar;
+import java.util.Locale;
 
 import static android.widget.Toast.LENGTH_LONG;
 
@@ -77,12 +81,14 @@ public class MainActivity extends AppCompatActivity {
         sendBroadcast(intnet);
 
         startService(new Intent(getBaseContext(), ServicoParaGPS.class));
+
     }
 
     public void startPerformance(View view){
         File arquivo = new File(Environment.getExternalStorageDirectory().toString() + "/" + "Comando.txt");
 
         try {
+            arquivo.createNewFile();
             FileWriter escritor = new FileWriter(arquivo, false);
 
             escritor.write("desempenho\n");
@@ -99,6 +105,7 @@ public class MainActivity extends AppCompatActivity {
         File arquivo = new File(Environment.getExternalStorageDirectory().toString() + "/" + "Comando.txt");
 
         try {
+            arquivo.createNewFile();
             FileWriter escritor = new FileWriter(arquivo, false);
 
             escritor.write("economia\n");
@@ -115,6 +122,7 @@ public class MainActivity extends AppCompatActivity {
         File arquivo = new File(Environment.getExternalStorageDirectory().toString() + "/" + "Comando.txt");
 
         try {
+            arquivo.createNewFile();
             FileWriter escritor = new FileWriter(arquivo, false);
 
             escritor.write("automatico\n");
@@ -131,6 +139,7 @@ public class MainActivity extends AppCompatActivity {
         File arquivo = new File(Environment.getExternalStorageDirectory().toString() + "/" + "Comando.txt");
 
         try {
+            arquivo.createNewFile();
             FileWriter escritor = new FileWriter(arquivo, false);
 
             escritor.write("desligado\n");
@@ -142,4 +151,5 @@ public class MainActivity extends AppCompatActivity {
 
         Toast.makeText(this, "Desligado", LENGTH_LONG).show();
     }
+
 }

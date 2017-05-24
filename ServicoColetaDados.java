@@ -224,7 +224,7 @@ public class ServicoColetaDados extends Service {
                             checkpoint_Tensao = new BufferedReader(new FileReader(arquivoTempoInicial));
                             arquivoEixoX.createNewFile();//Garantindo que o arquivo existe.
                             escritor = new FileWriter(arquivoEixoX, true);
-                            escritor.write("" + System.currentTimeMillis() + (-Integer.parseInt(checkpoint_Tensao.readLine()) + "\n"));//Esses -10800000 são para converter o fuso horário para o horário de brasília.
+                            escritor.write("" + (System.currentTimeMillis() -Long.parseLong(checkpoint_Tensao.readLine()) + "\n"));//Esses -10800000 são para converter o fuso horário para o horário de brasília.
                             escritor.close();//Este é para que cada regressão inicie onsiderando que o momento dedesconexão do carregador é o momento inicial (zero) da regressão.
                             checkpoint_Tensao.close();
 
@@ -241,11 +241,11 @@ public class ServicoColetaDados extends Service {
                     contador = 0;//Reiniciamos o contador de amostragem.
 
                     if(modo_Desempenho.equals("desligado")){
-                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (8*3600000), pendingIntent );//No modo de economia, colete dados a cada 8 horas.
+                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (600000), pendingIntent );//No modo de desligado (amostragem), colete dados a cada 10 minutos.
                     }else if(modo_Desempenho.equals("economia")) {
-                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (2*3600000), pendingIntent );//No modo de economia, colete dados a cada 2 horas.
+                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (1*3600000), pendingIntent );//No modo de economia, colete dados a cada 1 horas.
                     }else{
-                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (1800000), pendingIntent);//No modo de desempenho, colete dados a cada meia hora o arqivo.
+                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (600000), pendingIntent);//No modo de desempenho, colete dados a cada 10 minutos.
                     }
                     handler.removeCallbacks(this);
 
