@@ -116,7 +116,7 @@ public class ServicoDownload extends Service {
                     desligaSensores();//Desliga sensores para economizar.
 
                     if(modo_Desempenho.equals("desligado")){
-                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (4*3600000), pendingIntent );//No modo de deligado, não baixe, mas se atualiza a cada 4 horas.
+                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (1*3600000), pendingIntent );//No modo de deligado, não baixe, mas se atualiza a cada 1 horas.
                     }else if(modo_Desempenho.equals("economia")) {
                         alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (4*3600000), pendingIntent );//No modo de economia, baixe a cada 4 horas.
                     }else{

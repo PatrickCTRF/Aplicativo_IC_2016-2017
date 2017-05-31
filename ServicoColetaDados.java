@@ -209,7 +209,7 @@ public class ServicoColetaDados extends Service {
 
 
                         Log.v("MMQ", "Verificando se está descarregando.");
-                        if(info.getStatusString().equals("Discharging")) {//Só coleta pontos para a regressão de consumo se a bateria estiver sendo usada como alimentação.
+                        if(info.getStatusString().equals("Discharging") && modo_Desempenho.equals("desligado")) {//Só coleta pontos para a regressão de consumo se a bateria estiver sendo usada como alimentação e estivermos na fase de analisar como o usuário usa o celular (modo desligdo).
                             Log.v("MMQ", "Escrevendo mais um ponto de amostragem nos arquivos vetores.");
 
                             arquivoTensaoInicial.createNewFile();
@@ -241,7 +241,7 @@ public class ServicoColetaDados extends Service {
                     contador = 0;//Reiniciamos o contador de amostragem.
 
                     if(modo_Desempenho.equals("desligado")){
-                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (600000), pendingIntent );//No modo de desligado (amostragem), colete dados a cada 10 minutos.
+                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (1800000), pendingIntent );//No modo de desligado (amostragem), colete dados a cada 10 minutos.
                     }else if(modo_Desempenho.equals("economia")) {
                         alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (1*3600000), pendingIntent );//No modo de economia, colete dados a cada 1 horas.
                     }else{
@@ -254,11 +254,11 @@ public class ServicoColetaDados extends Service {
                     contador = 0;//Reiniciamos o contador de amostragem.
 
                     if(modo_Desempenho.equals("desligado")){
-                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (8*3600000), pendingIntent );//No modo de economia, colete dados a cada 8 horas.
+                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (1800000), pendingIntent );//No modo de desligado (amostragem), colete dados a cada 10 minutos.
                     }else if(modo_Desempenho.equals("economia")) {
-                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (2*3600000), pendingIntent );//No modo de economia, colete dados a cada 2 horas.
+                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (1*3600000), pendingIntent );//No modo de economia, colete dados a cada 1 horas.
                     }else{
-                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (1800000), pendingIntent);//No modo de desempenho, colete dados a cada meia hora o arqivo.
+                        alarm.set(AlarmManager.RTC, System.currentTimeMillis() + (600000), pendingIntent);//No modo de desempenho, colete dados a cada 10 minutos.
                     }
                     handler.removeCallbacks(this);
 
