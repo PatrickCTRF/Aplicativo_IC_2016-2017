@@ -58,7 +58,9 @@ public class ServicoColetaDados extends Service {
         NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(getBaseContext());
         mBuilder.setContentTitle("Rodando Amostragem Controle").setSmallIcon(R.mipmap.ic_launcher).setContentText("" + System.currentTimeMillis());
 
-        mNotifyManager.notify(id, mBuilder.build());
+        //mNotifyManager.notify(id, mBuilder.build());
+
+        startForeground(id, mBuilder.build());
 
 
         info.getInfo();
