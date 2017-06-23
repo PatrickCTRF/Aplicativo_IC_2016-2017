@@ -1,144 +1,255 @@
-package com.example.patrick.amostragemcontrole;
+//DDRB é ponteiro dereferenciado para o registrador DDRB
+//PORTB é ponteiro dereferenciado para o registrador PORTB
+//PIND e o registrador usado para leitura dos pinos 0 a 7.
 
-import android.app.AlarmManager;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.app.Service;
-import android.content.Context;
-import android.content.Intent;
-import android.os.Environment;
-import android.os.Handler;
-import android.os.IBinder;
-import android.support.v4.app.NotificationCompat;
-import android.util.Log;
-import android.widget.Toast;
+# define BIT0_MASK 0b00000001
+# define BIT1_MASK 0b00000010
+# define BIT2_MASK 0b00000100
+# define BIT3_MASK 0b00001000
+# define BIT4_MASK 0b00010000
+# define BIT5_MASK 0b00100000
+# define BIT6_MASK 0b01000000
+# define BIT7_MASK 0b10000000
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+//#define AMOSTRAGEM 4//Quantidade de amostras que serao colhidas para determinar a velocidade do motor (minimizando o erro). Colhe duas voltas de amostras ([48pulsos por volta]*2 = 96).
 
-import static android.widget.Toast.LENGTH_LONG;
-import static java.lang.Double.parseDouble;
+int teste = 0;
+int milisegundos = 0;//Variaveis que cronometram o tempo decorrido desde o inicio do sistema.
+long segundos = 0;
+double tempoAtual = 0;//Um double que indica em um "timestamp", de [segundos,milisegundos], quanto tempo deccoreu do inicio do sistema. Extremamente util para ordenar eventos sob tempo real decorrido com poucas comparaçoes.
+
+double botao1 = 0;//Variaveis que guardam o momento de ocorrencia de eventos em pinos especificos
+double botao2 = 0;
+double encoderA = 0;
+double encoderB = 0;
+int n_amostras_encoder = 0;
+
+
+double old_botao1 = 0;//Variaveis para debouncing.
+double old_botao2 = 0;
+double old_encoderA = 0;
+double old_encoderB = 0;
+double old_tempoAtual = 0;
+double threshold = 0.05;
+
+int velocidade = 1;//Varia de -20 a +20. Diretamente proporcional a velocidade do motor.
+int display_sentido = 0;//1 e -1 indicam rotaçao no sentido horario e anti horario, respectivamente.
+double display_velocidade = 0;//Indica a velocidade medida atraves do encoder.
+double old_display_velocidade = 0;//Serve para verificarmos se a velocidade do motor mudou.
+int old_velocidade = 0;
+double speed_threshlod = 3;
+int AMOSTRAGEM = 4;
+
+
+void setup() {
+  
+cli(); //desativa interrupções globais.
+
+// Escrita ou Leitura
+DDRB = DDRB|(BIT5_MASK)|(BIT4_MASK)|(BIT3_MASK); // Os bits 5,4 e 3 (pinos 13, 12 e 11, respectivamente) sao de saida.
+DDRD = DDRD & ~(BIT2_MASK|BIT3_MASK|BIT4_MASK|BIT5_MASK);// 2 a 5 sao pinos sao de entrada para usarmos em interrupçes.
+
+
+EICRA = 0b11;//Ativa em borda de subida a interrupção.
+EIMSK = 0b1;//Ativa a interrupção INT0.
+
+PCMSK2 = 0b11000;//Ativa interrupçao nos bits dos pinos 3 a 4 e desabilita-a nos demais DESTE registrador.
+PCICR = (BIT2_MASK);//Ativa as interrupçes dos pinos de bits setado no registrador PCMSK2, desativa nos demais PCMSK.
+
+init_PWM();
+
+sei();//Ativa interrupções globais.
+
+Serial.begin(9600);// A taxa na qual nos comunicmos com o Serial (monitor/plotter). Valores usuais: 9600 230400
+Serial.println("\nO Simulador pode\ndemorar ate 3s\npara atualizar.\nSeja Paciente.\n\nMotor ATIVO");
+  
+initTimer1();
+
+}
+
+void loop() {
+  
+  
+  n_amostras_encoder;
+ /**
+  * Desejamos que o motor gire de 0 a 1000RPM em cada sentido, sendo que
+  * o mesmo gira a 1232RPM quando alimentado com 6,4V sob um PWM de 255.
+  * Sendo assim, precisamos de um PWM de 207 para atingir o valor 1000RPM.
+  * do motor.
+  */ 
+  if(velocidade>0){
+    OCR2A = (int)(velocidade*207)/20;//Regra de 3 para setar a velocida do motor pelo pwm. 100 esta para 93, assim como velocidade atual esta para X, onde X  o que devemos colocar em OCR2A.
+    PORTB |= BIT4_MASK;
+    PORTB &= ~BIT5_MASK;
+  }
+  if(velocidade<0){
+    OCR2A = (int)(-velocidade*207)/20;//Se a velocidade for negativa, o motor gira para o outro lado, mas o PWM é o mesmo.
+    PORTB |= BIT5_MASK;
+    PORTB &= ~BIT4_MASK;
+  }
+  
+  if(display_velocidade >= old_display_velocidade + speed_threshlod || display_velocidade < old_display_velocidade - speed_threshlod){
+    
+    if(velocidade>0){
+    Serial.println("\n\nSentido Alvo: Anti Horario");
+    Serial.print("Velocidade Alvo: ");
+  	Serial.println((1000*velocidade)/20);
+    }
+    if(velocidade<0){
+      Serial.println("\n\nSentido Alvo: Horario");
+      Serial.print("Velocidade Alvo: ");
+      Serial.println((-1000*velocidade)/20);
+    }
+    
+    if(display_sentido>0){Serial.println("Sentido Medido: Anti Horario");}
+    else{Serial.println("Sentido Medido: Horario");}
+    
+    Serial.print("Velocidade Medida: ");
+    Serial.println(display_velocidade);
+    old_display_velocidade = display_velocidade;
+    
+  }
+  
+  if(display_velocidade != 0){
+    speed_threshlod = display_velocidade/100;//Nossa margem de erro de leitura é 1/100 do valor de velocidade atual (para mais ou para menos).
+    AMOSTRAGEM = display_velocidade/10;
+  }
+  
+}
+
+ISR (INT0_vect){ //Se a interrupçao foi gerada por uma borda de SUBIDA no pino 4... (Se a borda de descida que gerou a interrupçao, este bit valera zero e nao sera executado).
+    
+    encoderA = tempoAtual;//Quando o encoder gerar um pulso, armazene nele o momento em queo evento ocorreu.
+   
+    if(PIND & BIT5_MASK){//O que define o sentido de rotaçao  a ordem de acionamento dos canais do encoder.
+     display_sentido = 1;//Se o canal B ja estava acionado quando A foi acionado, o sentido eh horario.
+    }else{
+     display_sentido = -1;//Se nao,  anti horario.
+    }
+    
+    /**
+     *Sempre que chamar esta interrupço, significa que ocorreu um pulso no encoder canal A e incrementa o nmero de amostras.
+     *Nao eh necssario variavel de armazenamento temporario auxiliar, pois a variavel old_encoderA ja guarda o ultimo momento em que terminamos de colher a amostra.
+     */
+    
+    if(++n_amostras_encoder>=AMOSTRAGEM){//Quando possuirmos um numero de amostras igual a AMOSTRAGEM, realizamos a media de velocidade.colehmos
+      
+      display_velocidade = (60*AMOSTRAGEM)/(48*(encoderA-old_encoderA));//Como o periodo medido  apenas 1/48 do periodo de umarotaçao completa, devemos multiplica-lo por 48. 60vezes eh para converter de hertz para RPM. A quantidade de AMOSTRAGEM clhidas diminui, proporcionalmente, o periodo.
+      old_encoderA = encoderA;//Atualiza qual o novo valor de old_encoderA.
+      n_amostras_encoder = 0;
+      
+    }
+    
+  }
+
+ISR (INT1_vect) {}
+
+
+ISR (PCINT2_vect) {
+
+  //if(PIND & BIT2_MASK)
+  
+  if(PIND & BIT3_MASK){//Se a interrupçao foi gerada por uma borda de SUBIDA no pino 3... (Se a borda de descida que gerou a interrupçao, este bit valera zero e nao sera executado).
+    
+    //old_botao2 = botao2;
+    botao2 = tempoAtual;//Quando este botao for pressionado, armazene nele o momento em queo evento ocorreu.
+    
+    if( botao2 >= old_botao2 + threshold){//Debouncing
+      old_botao2 = botao2;
+      
+      if(velocidade>-20) velocidade--;//Se a velocidadenao esta no valor maximo, incremente-a
+      
+    }
+    
+  }
+  
+  if(PIND & BIT4_MASK){//Se a interrupçao foi gerada por uma borda de SUBIDA no pino 2... (Se a borda de descida que gerou a interrupçao, este bit valera zero e nao sera executado).
+    
+    botao1 = tempoAtual;//Quando este botao for pressionado, armazene nele o momento em queo evento ocorreu.
+    
+    if( botao1 >= old_botao1 + threshold){//Debouncing
+      old_botao1 = botao1;
+      
+      if(velocidade<20) velocidade++;//Se a velocidadenao esta no valor maximo, incremente-a
+      
+    }
+    
+  }
+}
 
 /**
- * Created by patrick on 24/03/17.
+ * Configuraçoes do Timer/Counter 2 para modo Fast PWM.
+ * O pino que recebe o sinal do PWM, neste caso, eh o 22.
  */
+void init_PWM(){
 
-public class ServicoColetaDados extends Service {
+  DDRB |= BIT3_MASK; // pino digital 11 do Arduino (OC2A) configurado como saÃda
+  
+  // Timer/Counter 2 Control Register A
+  TCCR2A = (1<<COM2A1)|(1<<COM2B1)|(1<<WGM21)|(1<<WGM20);
+  
+  // Output Compare 2 Register A
+  OCR2A = 0; // Controla o duty cycle da saida OC2A (pino 22). Faixa de valores: 0 a 255
+ 
+  // Timer/Counter 2 Control Register B
+  TCCR2B = (1<<CS20); // Configura o prescaler para nos passar o clock da placa.
+}
 
-    final Handler handler = new Handler();
-    final AquisicaoSensores info = new AquisicaoSensores(this);
-
-    AlarmManager alarm;
-
-    FileWriter escritor;
-
-    Runnable runnableCode;
-
-
-    @Override
-    public IBinder onBind(Intent arg0) {
-        return null;
-    }
-
-
-    @Override
-    public int onStartCommand(final Intent intent, int flags, int startId) {
-
-        Toast.makeText(this, "Service Coletando Started", LENGTH_LONG).show();
-
-        alarm = (AlarmManager) getBaseContext().getSystemService(Context.ALARM_SERVICE);
-        final PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, new Intent("com.example.patrick.START_SERVICOCOLETA_DADOS"),  PendingIntent.FLAG_UPDATE_CURRENT);
-
-        int id = 1;
-
-        NotificationManager mNotifyManager = (NotificationManager) getBaseContext().getSystemService(Context.NOTIFICATION_SERVICE);
-        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(getBaseContext());
-        mBuilder.setContentTitle("Rodando Amostragem Controle").setSmallIcon(R.mipmap.ic_launcher).setContentText("" + System.currentTimeMillis());
-
-        //mNotifyManager.notify(id, mBuilder.build());
-
-        startForeground(id, mBuilder.build());
-
-
-        info.getInfo();
+/**
+ * Esta interrupçao ocorre sempre que o contador atinge o valor maximo da contagem, que,
+ * na atual configuraçao, vale OCR2A.
+ * Esta interrupçao ser chamada a cada 2ms, incrementando a variavel milisegundos e a 
+ * variavel segundos (esta somente a cada 2000 chamadas).
+ * O valor destas variaveis eh convertido para um double, de forma que podemos facilmente 
+ * comparar a ordem cronologica entre dois eventos.
+ */
+ISR(TIMER1_OVF_vect){
+ 
+ TCNT1 = 0;//Zere a contagem apos atingirmos o valor alvo (OCR1A).
+ milisegundos++;//Indique que se passou mais 1 milisegundo.
+ 
+ if(milisegundos>=1000){//A cada passagem de 1000 milisegundos, acrescente 1 segundo e zere a contagem dos milisegundos.
+    milisegundos = 0;
+    segundos++;
+  }
+  
+  tempoAtual = segundos + milisegundos/(double)1000;//Concatene os dados para podermos comparar a ORDEM DOS EVENTOS mais facilmente - como se fosse o timestamp UNIX.
+  
+  TIFR1 |= (1<<OCR2A)|(1<<TOIE2);//Zera as flags relacionadas a esta interrupçao. Elas supostamente se zeram sozinhas, estamos somente garantindo isso para nao perder tempo debuggando.
+}
 
 
-        runnableCode = new Runnable() {
-
-            private int contador = 0;
-            private int contadorDeLongoPrazo = 0;
-
-            @Override
-            public void run() {
-
-                Log.v("SERVICO", "O ServicoColetaDados foi chamado. Contador: " + contador + "  Contador De Longo Prazo: " + contadorDeLongoPrazo);
-
-                if(info.getStatusString() == null){//Aguardamos haver dados.
-
-                    Log.v("StatusString", "NULA");
-                    info.getInfo();
-                    handler.postDelayed(this, 1000);// 1seg.
-
-                }else{
-
-                    Log.v("StatusString", "NAO NULA");
-
-                    File arquivoEixoX = new File(Environment.getExternalStorageDirectory().toString() + "/" + "Controle_Eixo_X_Tempo.txt");
-                    File arquivoEixoY = new File(Environment.getExternalStorageDirectory().toString() + "/" + "Controle_Eixo_Y_Bateria.txt");
-
-//=========================DADOS PARA A REGRESSÃO LINEAR========================================================================================================================================================"
-
-                    try {
-
-                        Log.v("MMQ", "Verificando se está descarregando.");
-                        if(info.getStatusString().equals("Discharging")) {//Só coleta pontos para a regressão de consumo se a bateria estiver sendo usada como alimentação.
-                            Log.v("MMQ", "Escrevendo mais um ponto de amostragem nos arquivos vetores.");
-
-                            arquivoEixoY.createNewFile();//Garantindo que o arquivo existe.
-                            escritor = new FileWriter(arquivoEixoY, true);
-                            escritor.write("" + info.getLevel() + "\n");//Estamos normalizando o level de bateria no momento de retirada do carregador no valor máximo para facilitar a regressão.
-                            escritor.close();
-
-                            arquivoEixoX.createNewFile();//Garantindo que o arquivo existe.
-                            escritor = new FileWriter(arquivoEixoX, true);
-                            escritor.write("" + System.currentTimeMillis() + "\n");//Esses -10800000 são para converter o fuso horário para o horário de brasília.
-                            escritor.close();
-
-                        }
-
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                    alarm.set(AlarmManager.RTC, System.currentTimeMillis() + 1800000, pendingIntent );
-                    handler.removeCallbacks(this);
-//==================================FIM DA OBTENÇÃO===============================================================================================================================================
-
-                }
-            }
-        };
-
-        handler.post(runnableCode);
-
-        return START_STICKY;
-    }
-
-    private void desligaSensores(){//Este métoddo permite ao celular desligar os sensores e GPS para poupar energia.
-        if(info != null) info.onDestroy();//Deixa de requisitar atualizações ao sistema e remove os listener. Economiza energia e evita relatório de erros.
-    }
-
-    @Override
-    public void onDestroy() {
-
-        alarm.cancel(PendingIntent.getBroadcast(this, 0, new Intent("com.example.patrick.START_SERVICOCOLETA_DADOS"),  PendingIntent.FLAG_UPDATE_CURRENT));
-        desligaSensores();
-        Toast.makeText(this, "Service Destroyed", LENGTH_LONG).show();
-        handler.removeCallbacks(runnableCode);//Retira todas as chamadas agendadas deste serviço.
-        super.onDestroy();
-
-    }
-
+/**
+ * Esta funço inicializa o Timer 1 atraves
+ * dos registradores necessrios.
+ */
+void initTimer1(){
+  
+  // TCNT1H e TCNT1L - TIMER/COUNTER1 REGISTER
+  // Inicia o contador com o valor 0x0000
+  TCNT1 = 0;
+  
+  // TCCR1A - TIMER/COUNTER1 CONTROL REGISTER A
+  // COM1A1 = 0; COM1A0 = 0 - OC1A desabilitado
+  // COM1B1 = 0; COM1B0 = 0 - OC1B desabilitado
+  // WGM11 = 0; WGM10 = 0 - Operação Fast PWM do timer: TOP = OCR2A e TOV2 flag ativada quando o contador atinge
+  TCCR1A = (1<<WGM11)|(1<<WGM10);
+  
+  // TIMSK1 - Timer/Counter 1 Interrupt Mask Register
+  // ICIE (Input Capture Interrupt Enable) = 0 - Interrupções de captura desabilitadas.
+  // OCIEB (Output Compare B Match Interrupt Enable) = 0 - Interrupções geradas pela comparação com o registrador B desabilitadas.
+  // OCIEA (Output Compare A Match Interrupt Enable) = 0 - Interrupções geradas pela comparação com o registrador A desabilitadas.
+  // TOIE (Overflow Interrupt Enable) = 1 - As iterrupções relacionadas ao overflow do contador estão habilitadas.
+  TIMSK1 = (1<<TOIE1);
+  
+  // TCCR1B - TIMER/COUNTER1 CONTROL REGISTER B
+  // ICNC1 = 0 - O modo de captura de entrada não está sendo usado
+  // ICES1 = 0 - O modo de captura de entrada não está sendo usado
+  // WGM13 = 0; WGM12 = 0 - Operação fast PWM do timer: TOP = OCR1A e TOV1 flag ativada quando o contador atinge
+  // contagem igual a TOP
+  // CS12-0 = 011 - Pre-scaler = 64 -> clock do contador é 26MHz/64 = 250kHz. Portanto, cada ciclo de contagem de 0 a 250 (Valor de OCR1A) dura
+  // 250 * 1/250000 = 1ms.
+  TCCR1B = (1<<WGM13)|(1<<WGM12)|(1<<CS11)|(1<<CS10); 
+  
+  OCR1A = 250;//Valor o qual, quando TCNT1 atingir, fara ser executada a interrupço de overflow A.
 }
